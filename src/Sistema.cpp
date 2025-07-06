@@ -10,7 +10,6 @@ void insertionSort(Evento** arr, int n) {
     for (i = 1; i < n; i++) {
         chave = arr[i];
         j = i - 1;
-        // CORREÇÃO: Usa o operador< sobrecarregado da classe Data.
         while (j >= 0 && chave->dataHora < arr[j]->dataHora) {
             arr[j + 1] = arr[j];
             j = j - 1;
@@ -44,11 +43,9 @@ void deletePacoteInfo(PacoteInfo* pi) {
 Sistema::Sistema() {}
 
 Sistema::~Sistema() {
-    // Libera a memória dos valores armazenados nos índices
     indiceClientes.limparValores(deleteClienteInfo);
     indicePacotes.limparValores(deletePacoteInfo);
 
-    // Libera a memória dos próprios eventos
     NoLista<Evento*>* noEvento = linhaDoTempo.getCabeca();
     while (noEvento != nullptr) {
         delete noEvento->dado;
@@ -64,7 +61,7 @@ void Sistema::executar() {
     }
 }
 
-// --- Funções de Processamento e Parsing (Modularizadas) ---
+// --- Funções de Processamento e Parsing (Modularizadas e Corrigidas) ---
 void Sistema::processarLinha(const std::string& linha) {
     std::stringstream ss(linha);
     std::string dataStr, tipoCmd;
@@ -74,6 +71,7 @@ void Sistema::processarLinha(const std::string& linha) {
         Data data = Data::fromString(dataStr);
         int idPacote;
         std::string tipoEvento;
+        // Ordem de parsing correta: <id_pacote> <tipo_evento>
         if (!(ss >> idPacote >> tipoEvento)) return;
         processarEvento(ss, data, idPacote, tipoEvento);
     } else if (tipoCmd == "CL" || tipoCmd == "PC") {
@@ -95,10 +93,13 @@ void Sistema::processarEventoRG(std::stringstream& ss, const Data& data, int idP
     std::string remetente, destinatario;
     if (!(ss >> remetente >> destinatario)) return;
     
+    // Ignora campos adicionais do input
+    std::string campo1, campo2;
+    ss >> campo1 >> campo2;
+
     Evento* novoEvento = new EventoRG(data, idPacote, remetente, destinatario);
     linhaDoTempo.insere(novoEvento);
 
-    // Atualiza índice de pacotes
     PacoteInfo* pInfo = indicePacotes.busca(idPacote);
     if (!pInfo) {
         pInfo = new PacoteInfo{new Lista<Evento*>()};
@@ -106,7 +107,6 @@ void Sistema::processarEventoRG(std::stringstream& ss, const Data& data, int idP
     }
     pInfo->historico->insere(novoEvento);
 
-    // Atualiza índice de clientes
     ClienteInfo* cInfoRem = indiceClientes.busca(remetente);
     if (!cInfoRem) {
         cInfoRem = new ClienteInfo{new Lista<int>()};
@@ -127,13 +127,12 @@ void Sistema::processarEventoRG(std::stringstream& ss, const Data& data, int idP
 }
 
 void Sistema::processarEventoTR(std::stringstream& ss, const Data& data, int idPacote) {
-    std::string p1, p2;
-    if (!(ss >> p1 >> p2)) return;
+    std::string localOrigem, localDestino;
+    if (!(ss >> localOrigem >> localDestino)) return;
 
-    Evento* novoEvento = new EventoTR(data, idPacote, p1, p2);
+    Evento* novoEvento = new EventoTR(data, idPacote, localOrigem, localDestino);
     linhaDoTempo.insere(novoEvento);
-
-    // CORREÇÃO: Garante que o pacote seja criado no índice se for novo.
+    
     PacoteInfo* pInfo = indicePacotes.busca(idPacote);
     if (!pInfo) {
         pInfo = new PacoteInfo{new Lista<Evento*>()};
@@ -144,7 +143,7 @@ void Sistema::processarEventoTR(std::stringstream& ss, const Data& data, int idP
 
 void Sistema::processarEventoComLocal(std::stringstream& ss, const Data& data, int idPacote, const std::string& tipoEvento) {
     std::string local;
-    ss >> std::ws; 
+    ss >> std::ws;
     std::getline(ss, local);
     if (local.empty()) return;
 
@@ -153,10 +152,9 @@ void Sistema::processarEventoComLocal(std::stringstream& ss, const Data& data, i
     else if (tipoEvento == "RM") novoEvento = new EventoRM(data, idPacote, local);
     else if (tipoEvento == "UR") novoEvento = new EventoUR(data, idPacote, local);
     else if (tipoEvento == "EN") novoEvento = new EventoEN(data, idPacote, local);
-
+    
     if (novoEvento) {
         linhaDoTempo.insere(novoEvento);
-        // CORREÇÃO: Garante que o pacote seja criado no índice se for novo.
         PacoteInfo* pInfo = indicePacotes.busca(idPacote);
         if (!pInfo) {
             pInfo = new PacoteInfo{new Lista<Evento*>()};
@@ -178,74 +176,77 @@ void Sistema::processarConsulta(const std::string& linha, const std::string& tip
     }
 }
 
+// CORREÇÃO: Consulta CL retorna todos os eventos de todos os pacotes do cliente, em ordem.
 void Sistema::processarConsultaCL(const std::string& linhaConsulta, const std::string& nomeCliente) {
-    // CORREÇÃO: Formata a saída da linha de consulta para remover o zero inicial.
-    std::stringstream ss(linhaConsulta);
-    std::string dataStr, cmd, arg;
-    ss >> dataStr >> cmd >> arg;
-    std::cout << dataStr.substr(1) << " " << cmd << " " << arg << std::endl;
+    std::string dataFormatada = linhaConsulta;
+    // O formato de saída para a linha de consulta remove um zero inicial do timestamp
+    if (dataFormatada.length() > 1 && dataFormatada[0] == '0') {
+        dataFormatada = dataFormatada.substr(1);
+    }
+    std::cout << dataFormatada << std::endl;
 
     ClienteInfo* cInfo = indiceClientes.busca(nomeCliente);
-    
     if (!cInfo || cInfo->pacotes->vazia()) {
         std::cout << "0" << std::endl;
         return;
     }
 
-    int count = 0;
-    NoLista<int>* tempNo = cInfo->pacotes->getCabeca();
-    while (tempNo != nullptr) {
-        PacoteInfo* pInfo = indicePacotes.busca(tempNo->dado);
-        if (pInfo && !pInfo->historico->vazia()) {
-            count++;
-            if (pInfo->historico->getTamanho() > 1) count++;
+    // Passagem 1: Contar o número total de eventos para alocar o array
+    int totalEventos = 0;
+    NoLista<int>* noPacoteContagem = cInfo->pacotes->getCabeca();
+    while (noPacoteContagem != nullptr) {
+        PacoteInfo* pInfo = indicePacotes.busca(noPacoteContagem->dado);
+        if (pInfo) {
+            totalEventos += pInfo->historico->getTamanho();
         }
-        tempNo = tempNo->proximo;
+        noPacoteContagem = noPacoteContagem->proximo;
     }
-
-    if (count == 0) {
+    
+    if (totalEventos == 0) {
         std::cout << "0" << std::endl;
         return;
     }
-
-    Evento** eventosResposta = new Evento*[count];
+    
+    // Alocar e preencher o array
+    Evento** eventosCliente = new Evento*[totalEventos];
     int idx = 0;
-    NoLista<int>* noPacoteId = cInfo->pacotes->getCabeca();
-    while (noPacoteId != nullptr) {
-        PacoteInfo* pInfo = indicePacotes.busca(noPacoteId->dado);
+    NoLista<int>* noPacote = cInfo->pacotes->getCabeca();
+    while (noPacote != nullptr) {
+        PacoteInfo* pInfo = indicePacotes.busca(noPacote->dado);
         if (pInfo && !pInfo->historico->vazia()) {
-            eventosResposta[idx++] = pInfo->historico->getCabeca()->dado;
-            if (pInfo->historico->getTamanho() > 1) {
-                eventosResposta[idx++] = pInfo->historico->getCauda()->dado;
+            NoLista<Evento*>* noEvento = pInfo->historico->getCabeca();
+            while (noEvento != nullptr) {
+                eventosCliente[idx++] = noEvento->dado;
+                noEvento = noEvento->proximo;
             }
         }
-        noPacoteId = noPacoteId->proximo;
+        noPacote = noPacote->proximo;
     }
-
-    insertionSort(eventosResposta, count);
-
-    std::cout << count << std::endl;
-    for (int i = 0; i < count; ++i) {
-        std::cout << eventosResposta[i]->toString() << std::endl;
+    
+    // Ordenar a lista combinada e imprimir
+    insertionSort(eventosCliente, totalEventos);
+    
+    std::cout << totalEventos << std::endl;
+    for (int i = 0; i < totalEventos; ++i) {
+        std::cout << eventosCliente[i]->toString() << std::endl;
     }
-
-    delete[] eventosResposta;
+    
+    delete[] eventosCliente;
 }
 
 void Sistema::processarConsultaPC(const std::string& linhaConsulta, int idPacote) {
-    // CORREÇÃO: Formata a saída da linha de consulta para remover o zero inicial.
-    std::stringstream ss(linhaConsulta);
-    std::string dataStr, cmd, arg;
-    ss >> dataStr >> cmd >> arg;
-    std::cout << dataStr.substr(1) << " " << cmd << " " << arg << std::endl;
-    
-    PacoteInfo* pInfo = indicePacotes.busca(idPacote);
+    std::string dataFormatada = linhaConsulta;
+    if (dataFormatada.length() > 1 && dataFormatada[0] == '0') {
+        dataFormatada = dataFormatada.substr(1);
+    }
+    std::cout << dataFormatada << std::endl;
 
-    if (!pInfo) {
+    PacoteInfo* pInfo = indicePacotes.busca(idPacote);
+    if (!pInfo || pInfo->historico->vazia()) {
         std::cout << "0" << std::endl;
         return;
     }
-    
+
     std::cout << pInfo->historico->getTamanho() << std::endl;
     NoLista<Evento*>* noEvento = pInfo->historico->getCabeca();
     while (noEvento != nullptr) {

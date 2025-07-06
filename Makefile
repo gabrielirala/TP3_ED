@@ -1,40 +1,29 @@
-# Makefile para o TP3 de AEDS 3
+CC = g++
+CFLAGS = -Wall -std=c++11 -g
+SRCDIR = src
+INCDIR = include  
+OBJDIR = obj
+BINDIR = bin
 
-# Compilador e flags
-CXX := g++
-CXXFLAGS := -std=c++11 -Wall -Wextra -Iinclude/
-LDFLAGS :=
+SOURCES = $(wildcard $(SRCDIR)/*.cpp)
+OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
+EXECUTABLE = $(BINDIR)/tp3.out
 
-# Diretorios
-SRC_DIR := src
-OBJ_DIR := obj
-BIN_DIR := bin
-INCLUDE_DIR := include
+all: $(EXECUTABLE)
 
-# Executável
-TARGET := $(BIN_DIR)/tp3.out
+$(EXECUTABLE): $(OBJECTS) | $(BINDIR)
+	$(CC) $(OBJECTS) -o $@
 
-# Arquivos fonte e objeto
-SOURCES := $(wildcard $(SRC_DIR)/*.cpp)
-OBJECTS := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SOURCES))
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
+	$(CC) $(CFLAGS) -I$(INCDIR) -c $< -o $@
 
-# Regra principal: criar o executável
-all: $(TARGET)
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
 
-# Regra para linkar o executável
-$(TARGET): $(OBJECTS)
-	@mkdir -p $(BIN_DIR)
-	$(CXX) $(LDFLAGS) -o $@ $^
+$(BINDIR):
+	mkdir -p $(BINDIR)
 
-# Regra para compilar os fontes em objetos
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	@mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
-# Regra para limpar os arquivos gerados
 clean:
-	@echo "Limpando arquivos gerados..."
-	@rm -rf $(OBJ_DIR)/* $(BIN_DIR)/*
+	rm -rf $(OBJDIR) $(BINDIR)
 
-# Phony targets
 .PHONY: all clean
