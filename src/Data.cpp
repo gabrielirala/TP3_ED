@@ -17,3 +17,4 @@ std::string Data::toString() const {
     oss << std::setfill('0') << std::setw(7) << timestamp;
     return oss.str();
 }
+

@@ -19,7 +19,12 @@ class EventoRG : public Evento {
 public:
     std::string remetente;
     std::string destinatario;
-    EventoRG(Data dh, int id, std::string rem, std::string dest);
+    // ADICIONE ESTES CAMPOS
+    std::string armazemOrigem;
+    std::string armazemDestino;
+
+    // ATUALIZE O CONSTRUTOR
+    EventoRG(Data dh, int id, std::string rem, std::string dest, std::string origem, std::string destino);
     std::string toString() const override;
 };
 
@@ -60,3 +65,4 @@ public:
 };
 
 #endif // EVENTO_H
+

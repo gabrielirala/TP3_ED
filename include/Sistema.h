@@ -53,7 +53,8 @@ private:
 public:
     Sistema();
     ~Sistema();
-    void executar();
+    void executar(std::istream& entrada);
 };
 
 #endif // SISTEMA_H
+
